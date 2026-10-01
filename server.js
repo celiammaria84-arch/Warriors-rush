@@ -1,10 +1,8 @@
 // Warriors Rush — servidor de salas e relay (Node 18+, dependência: ws)
 const http=require('http'),fs=require('fs'),path=require('path'),{WebSocketServer}=require('ws');
 const PORT=process.env.PORT||3000,INDEX=path.join(__dirname,'index.html');
-const srv=http.createServer((req,res)=>{
-  if(req.url==='/health'){res.end('ok');return}
-  fs.readFile(INDEX,(e,b)=>{if(e){res.writeHead(404);res.end('index.html não encontrado');return}
-    res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end(b)})});
+const FILES={'/':['index.html','text/html; charset=utf-8'],'/index.html':['index.html','text/html; charset=utf-8'],'/manifest.webmanifest':['manifest.webmanifest','application/manifest+json'],'/sw.js':['sw.js','text/javascript'],'/icon-192.png':['icon-192.png','image/png'],'/icon-512.png':['icon-512.png','image/png'],'/icon-512-maskable.png':['icon-512-maskable.png','image/png']};
+const srv=http.createServer((req,res)=>{const u=req.url.split('?')[0];if(u==='/health'){res.end('ok');return}const f=FILES[u];if(!f){res.writeHead(404);res.end('nao encontrado');return}fs.readFile(path.join(__dirname,f[0]),(e,b)=>{if(e){res.writeHead(404);res.end('arquivo ausente');return}res.writeHead(200,{'Content-Type':f[1],'Cache-Control':u==='/sw.js'?'no-cache':'public, max-age=300'});res.end(b)})});
 const wss=new WebSocketServer({server:srv,maxPayload:32*1024});
 const rooms=new Map();let queue=null;
 const send=(w,o)=>{if(w&&w.readyState===1)w.send(JSON.stringify(o))};
