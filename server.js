@@ -6,7 +6,7 @@ const srv=http.createServer((req,res)=>{let u=req.url.split('?')[0];if(u==='/hea
   const n=u.slice(1),ext=path.extname(n);if(!/^[\w.-]+$/.test(n)||!MT[ext]||(ext==='.js'&&n!=='sw.js')||HIDE.has(n)){res.writeHead(404);res.end('nao encontrado');return}
   fs.readFile(path.join(__dirname,n),(e,b)=>{if(e){res.writeHead(404);res.end('arquivo ausente');return}
     res.writeHead(200,{'Content-Type':MT[ext],'Cache-Control':n==='sw.js'||ext==='.html'?'no-cache':'public, max-age=300'});res.end(b)})});
-const wss=new WebSocketServer({server:srv,maxPayload:32*1024});
+const wss=new WebSocketServer({server:srv,maxPayload:32*1024,perMessageDeflate:false});
 const rooms=new Map();let queue=null;
 const send=(w,o)=>{if(w&&w.readyState===1)w.send(JSON.stringify(o))};
 // o que cada papel pode enviar ao outro (limita abuso)
@@ -18,12 +18,13 @@ function leave(w){
   if(w.room){if(rooms.get(w.room)&&rooms.get(w.room).h===w)rooms.delete(w.room);w.room=null}
   if(w.peer){send(w.peer,{t:'left'});w.peer.peer=null;w.peer.role=null;w.peer=null}
   w.role=null}
-wss.on('connection',ws=>{
+wss.on('connection',(ws,req)=>{
+  try{req.socket.setNoDelay(true)}catch(e){}
   ws.alive=true;ws.n=0;ws.on('pong',()=>{ws.alive=true});
   ws.on('message',raw=>{
-    if(++ws.n>150)return;let m;try{m=JSON.parse(raw)}catch(e){return}
+    if(++ws.n>150)return;const str=raw.toString();let m;try{m=JSON.parse(str)}catch(e){return}
     if(!m||typeof m.t!=='string')return;
-    if(m.t==='r'){if(!ws.peer||!m.d||!ALLOW[ws.role].has(m.d.k))return;send(ws.peer,m);return}
+    if(m.t==='r'){if(!ws.peer||!m.d||!ALLOW[ws.role].has(m.d.k))return;const pr=ws.peer;if(pr.readyState!==1)return;/* se a fila do destino está cheia, descarta snapshot/entrada velhos em vez de acumular atraso */if(pr.bufferedAmount>16384&&(m.d.k==='snap'||m.d.k==='in'))return;pr.send(str);return}
     if(m.t==='cancel'){leave(ws);return}
     if(ws.peer)return;
     if(m.t==='create'){leave(ws);const c=newCode();ws.room=c;rooms.set(c,{h:ws});send(ws,{t:'room',code:c})}

@@ -595,7 +595,7 @@ $('profx').onclick=()=>{snd('click');$('prof').classList.remove('show');$('menu'
 
 // ---- ONLINE (anfitrião simula · convidado envia comandos e desenha) ----
 const NET={ws:null},nsend=o=>{if(NET.ws&&NET.ws.readyState===1)NET.ws.send(JSON.stringify(o))},nr=d=>{if(NET.ws&&NET.ws.bufferedAmount>20000&&(d.k==='snap'||d.k==='in'))return;nsend({t:'r',d})},onlSt=m=>$('ost').textContent=m;
-const nAct=c=>nr({k:'act',c,a:+P.aim.toFixed(2),m:+P.am.toFixed(2)});
+const nAct=c=>{if(c!=='a')P.hold=RTT/1000+.12;nr({k:'act',c,a:+P.aim.toFixed(2),m:+P.am.toFixed(2)})};
 $('osrv').value=(location.protocol.startsWith('http')?location.host:'')||(()=>{try{return localStorage.getItem('afg_srv')||''}catch(e){return ''}})();
 function openOnl(){$('menu').classList.remove('show');$('onl').classList.add('show');onlSt('Pronto para conectar')}
 function netOpen(then){if(NET.ws&&NET.ws.readyState===1){then();return}let u=$('osrv').value.trim();if(!u){onlSt('Digite o endereço do servidor');return}
@@ -621,16 +621,24 @@ function netMsg(m){if(m.t==='room'){onlSt('Sala '+m.code+' — passe o código a
 const ser=o=>{const r={};for(const k in o){const v=o[k];if(k==='o')r.o=v===P?0:1;else if(typeof v==='number')r[k]=Math.round(v*100)/100;else if(typeof v!=='object'||v===null)r[k]=v}return r};
 const serP=t=>{const r=ser(t);r.cd={a:t.cd.a,s1:t.cd.s1,s2:t.cd.s2};return r};let snapT=0,inT=0,pgT=0,RTT=0;
 function hostSend(dt){snapT-=dt;if(snapT>0)return;snapT=.033;const ev=evq;evq=[];nr({k:'snap',d:{P:serP(P),E:serP(E),pr:proj.map(ser),zn:zones.map(ser),ob:orbs.map(ser),fx:fx.map(ser),ev,sc:[score.p,score.e],ov:over?(P.hp<=0?2:1):0}})}
-function ap(t,s,own,col){for(const k in s){if(k==='cd'||k==='x'||k==='y'||(own&&(k==='aim'||k==='am')))continue;t[k]=s[k]}if(!t._i){t.x=s.x;t.y=s.y;t._i=1}t.tx=s.x;t.ty=s.y;t.col=col;t.cds[t.w]=Object.assign(t.cds[t.w]||{a:0,s1:0,s2:0},s.cd)}
+function ap(t,s,own,col){for(const k in s){if(k==='cd'||k==='x'||k==='y'||(own&&(k==='aim'||k==='am')))continue;t[k]=s[k]}if(!t._i){t.x=s.x;t.y=s.y;t._i=1}t.tx=s.x;t.ty=s.y;{const h=t._h||(t._h=[]);h.push({t:performance.now(),x:s.x,y:s.y});if(h.length>12)h.shift()}t.col=col;t.cds[t.w]=Object.assign(t.cds[t.w]||{a:0,s1:0,s2:0},s.cd)}
 function applySnap(d){const ph=P.hp,eh=E.hp,ps=P.stun,es=E.stun;ap(P,d.E,true,'#5ec8ff');ap(E,d.P,false,'#b6ff5e');
  const Q=s=>(s.o=s.o===0?E:P,s);proj=d.pr.map(Q);zones=d.zn.map(Q);orbs=d.ob.map(Q);fx=d.fx;for(const f of d.ev)floats.push({x:f.x,y:f.y,t:f.t,c:f.c,l:1});
  score.p=d.sc[1];score.e=d.sc[0];if(P.hp<ph){snd('hurt');burst(P.x,P.y,'#ff6a4a',8,140,.35)}if(E.hp<eh){snd('hit');burst(E.x,E.y,'#ffd34d',8,140,.35)}if((P.stun>0&&ps<=0)||(E.stun>0&&es<=0))snd('stun');
  if(d.ov&&!over){over=true;const w=d.ov===2;snd(w?'win':'lose');setTimeout(()=>{if(!over)return;$('mt').textContent=w?'Vitória!':'Derrota';$('ms').textContent='Placar  Você '+score.p+' × '+score.e+' Inimigo';$('mb').style.display='none';$('msg').style.display='flex'},900)}
  else if(!d.ov&&over){over=false;$('msg').style.display='none'}}
-function predict(dt){let x=joy.x,y=joy.y;if(keys.a||keys.arrowleft)x-=1;if(keys.d||keys.arrowright)x+=1;if(keys.w||keys.arrowup)y-=1;if(keys.s||keys.arrowdown)y+=1;
- const m=Math.hypot(x,y),n=m>1?1/m:1,s=B[P.w].spd*(P.slow>0?.55:1)*(P.spdT>0?1.4:1);P.x=Math.max(30,Math.min(AW-30,P.x+x*n*s*dt));P.y=Math.max(30,Math.min(AH-30,P.y+y*n*s*dt));
- const ex=P.tx-P.x,ey=P.ty-P.y,d=Math.hypot(ex,ey);if(d>160){P.x=P.tx;P.y=P.ty}else if(d>50){const f=(d-50)/d*Math.min(1,dt*6);P.x+=ex*f;P.y+=ey*f}}
-function stepG(dt){const k=Math.min(1,dt*16);const pred=P.tx!==undefined&&!(P.stun>0||P.pl>0||P.dragT>0||P.dashT>0||P.retT>0||over);if(pred)predict(dt);for(const t of [P,E])if(t.tx!==undefined&&!(t===P&&pred)){if(Math.hypot(t.tx-t.x,t.ty-t.y)>250){t.x=t.tx;t.y=t.ty}else{t.x+=(t.tx-t.x)*k;t.y+=(t.ty-t.y)*k}}
+function predict(dt,noFix){let x=joy.x,y=joy.y;if(keys.a||keys.arrowleft)x-=1;if(keys.d||keys.arrowright)x+=1;if(keys.w||keys.arrowup)y-=1;if(keys.s||keys.arrowdown)y+=1;
+ const m=Math.hypot(x,y),n=m>1?1/m:1,s=B[P.w].spd*(P.slow>0?.55:1)*(P.spdT>0?1.4:1),a=Math.min(1,dt*12);
+ P.pvx=(P.pvx||0)+(x*n*s-(P.pvx||0))*a;P.pvy=(P.pvy||0)+(y*n*s-(P.pvy||0))*a;
+ P.x=Math.max(30,Math.min(AW-30,P.x+P.pvx*dt));P.y=Math.max(30,Math.min(AH-30,P.y+P.pvy*dt));
+ if(noFix)return;
+ const lag=Math.min(.35,RTT/1000),ex=P.tx+P.pvx*lag-P.x,ey=P.ty+P.pvy*lag-P.y,d=Math.hypot(ex,ey);
+ if(d>220){P.x=P.tx;P.y=P.ty;P.pvx=P.pvy=0}else if(d>50){const f=(d-50)/d*Math.min(1,dt*4);P.x+=ex*f;P.y+=ey*f}}
+const IDELAY=100;
+function interp(t,now){const h=t._h;if(!h||!h.length)return null;const rt=now-IDELAY;if(rt<=h[0].t)return h[0];
+ for(let i=h.length-1;i>0;i--){if(h[i-1].t<=rt){const a=h[i-1],b=h[i],u=b.t>a.t?Math.min(1,(rt-a.t)/(b.t-a.t)):1;return{x:a.x+(b.x-a.x)*u,y:a.y+(b.y-a.y)*u}}}
+ return h[h.length-1]}
+function stepG(dt){const k=Math.min(1,dt*16);const pred=P.tx!==undefined&&!(P.stun>0||P.pl>0||P.dragT>0||P.dashT>0||P.retT>0||over);P.hold=Math.max(0,(P.hold||0)-dt);if(pred)predict(dt,P.hold>0);else{P.pvx=P.pvy=0}const nowT=performance.now();for(const t of [P,E])if(t.tx!==undefined&&!(t===P&&pred)){if(t===E){const q=interp(t,nowT);if(q){t.x=q.x;t.y=q.y}continue}if(Math.hypot(t.tx-t.x,t.ty-t.y)>250){t.x=t.tx;t.y=t.ty}else{t.x+=(t.tx-t.x)*k;t.y+=(t.ty-t.y)*k}}
  for(const c in P.cd)P.cd[c]=Math.max(0,P.cd[c]-dt);P.dsh=Math.max(0,P.dsh-dt);P.swc=Math.max(0,P.swc-dt);
  for(const p of proj)if(p.vx!==undefined){p.x+=p.vx*dt;p.y+=p.vy*dt}for(const z of zones)z.life-=dt;
  for(const f of fx)f.l-=dt;fx=fx.filter(f=>f.l>0);for(const p of parts){p.x+=p.vx*dt;p.y+=p.vy*dt;p.l-=dt}parts=parts.filter(p=>p.l>0);
