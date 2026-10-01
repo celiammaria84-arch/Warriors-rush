@@ -1,8 +1,11 @@
 // Warriors Rush — servidor de salas e relay (Node 18+, dependência: ws)
 const http=require('http'),fs=require('fs'),path=require('path'),{WebSocketServer}=require('ws');
 const PORT=process.env.PORT||3000,INDEX=path.join(__dirname,'index.html');
-const FILES={'/':['index.html','text/html; charset=utf-8'],'/index.html':['index.html','text/html; charset=utf-8'],'/manifest.webmanifest':['manifest.webmanifest','application/manifest+json'],'/sw.js':['sw.js','text/javascript'],'/icon-192.png':['icon-192.png','image/png'],'/icon-512.png':['icon-512.png','image/png'],'/icon-512-maskable.png':['icon-512-maskable.png','image/png']};
-const srv=http.createServer((req,res)=>{const u=req.url.split('?')[0];if(u==='/health'){res.end('ok');return}const f=FILES[u];if(!f){res.writeHead(404);res.end('nao encontrado');return}fs.readFile(path.join(__dirname,f[0]),(e,b)=>{if(e){res.writeHead(404);res.end('arquivo ausente');return}res.writeHead(200,{'Content-Type':f[1],'Cache-Control':u==='/sw.js'?'no-cache':'public, max-age=300'});res.end(b)})});
+const MT={'.html':'text/html; charset=utf-8','.png':'image/png','.webmanifest':'application/manifest+json','.js':'text/javascript'},HIDE=new Set(['server.js','package.json','package-lock.json']);
+const srv=http.createServer((req,res)=>{let u=req.url.split('?')[0];if(u==='/health'){res.end('ok');return}if(u==='/')u='/index.html';
+  const n=u.slice(1),ext=path.extname(n);if(!/^[\w.-]+$/.test(n)||!MT[ext]||(ext==='.js'&&n!=='sw.js')||HIDE.has(n)){res.writeHead(404);res.end('nao encontrado');return}
+  fs.readFile(path.join(__dirname,n),(e,b)=>{if(e){res.writeHead(404);res.end('arquivo ausente');return}
+    res.writeHead(200,{'Content-Type':MT[ext],'Cache-Control':n==='sw.js'||ext==='.html'?'no-cache':'public, max-age=300'});res.end(b)})});
 const wss=new WebSocketServer({server:srv,maxPayload:32*1024});
 const rooms=new Map();let queue=null;
 const send=(w,o)=>{if(w&&w.readyState===1)w.send(JSON.stringify(o))};
